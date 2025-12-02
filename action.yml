@@ -1,0 +1,24 @@
+name: 'DockDesk'
+description: 'The automated documentation auditor. DockDesk ensures your README matches your Code logic.'
+author: 'DockDesk Team'
+branding:
+  icon: 'shield'  # This gives you a cool shield icon on the marketplace
+  color: 'blue'
+inputs:
+  openai_api_key:
+    description: 'OpenAI API Key'
+    required: true
+  code_file:
+    description: 'Path to the code file to check'
+    required: true
+  doc_file:
+    description: 'Path to the documentation file to check'
+    required: true
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.code_file }}
+    - ${{ inputs.doc_file }}
+  env:
+    OPENAI_API_KEY: ${{ inputs.openai_api_key }}
