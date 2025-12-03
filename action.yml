@@ -1,7 +1,7 @@
 name: 'DockDesk'
 description: 'Automated documentation auditor.'
 inputs:
-  openai_api_key:  # <--- defined here
+  openai_api_key:
     description: 'API Key (Gemini or OpenAI)'
     required: true
   github_token:
@@ -20,7 +20,7 @@ runs:
     - ${{ inputs.code_file }}
     - ${{ inputs.doc_file }}
   env:
-    # ✅ FIX: Map the input 'openai_api_key' to the env var 'OPENAI_API_KEY'
-    # This must match what is in your python script (os.getenv("OPENAI_API_KEY"))
+    # 🚨 CRITICAL FIX: Map the input 'openai_api_key' to the env var 'OPENAI_API_KEY'
+    # The Python script reads os.getenv("OPENAI_API_KEY"), so this must match!
     OPENAI_API_KEY: ${{ inputs.openai_api_key }}
     GITHUB_TOKEN: ${{ inputs.github_token }}
