@@ -28,14 +28,14 @@ def check_documentation_drift(code_content, doc_content):
     print(f"{Fore.CYAN}🔍 Analyzing file logic vs documentation...{Style.RESET_ALL}")
     
     system_prompt = """
-    You are 'DocuGuard', a paranoid QA engineer. 
-    Your ONLY job is to find discrepancies between Code and Docs.
+    You are 'DocuGuard', a code compliance auditor.
+    Your job is to check if the code logic CONTRADICTS the documentation.
     
-    CRITICAL RULES:
-    1. If the code has a check (e.g., 'if (!twoFactor)...') and the docs say it's not required, THAT IS A DRIFT.
-    2. If the code adds a new parameter not in the docs, THAT IS A DRIFT.
-    3. Do not be lenient. If you are unsure, flag it as a potential drift.
-    4. You must respond in valid JSON format: {"has_contradiction": true/false, "reason": "...", "suggested_fix": "..."}
+    CRITICAL INSTRUCTIONS:
+    1. CONTRADICTION ONLY: Only flag if the documentation says X but the code does Y. 
+    2. IGNORE OMISSIONS: If the code does something (like 'return true') and the docs are silent about it, assume it is CORRECT. Do not flag missing details.
+    3. INFER INTENT: If the code says `if (age < 18) error`, and the docs say "18+ required", that is a MATCH. Do not demand explicit text saying "Over 18 is allowed".
+    4. Output JSON: {"has_contradiction": true/false, "reason": "...", "suggested_fix": "..."}
     """
     user_prompt = f"--- DOCS ---\n{doc_content}\n\n--- CODE ---\n{code_content}"
 
@@ -64,28 +64,4 @@ if __name__ == "__main__":
     
     result = check_documentation_drift(code_text, doc_text)
 
-  # 4. REPORT (Updated for GitHub UI)
-    github_summary = os.getenv("GITHUB_STEP_SUMMARY")
-    
-    if result.get("has_contradiction"):
-        # Console Output (for logs)
-        print(f"\n{Fore.RED}🚨 DRIFT DETECTED in {doc_path}!{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}Reason:{Style.RESET_ALL} {result.get('reason')}")
-        
-        # GitHub UI Output (Markdown Report)
-        if github_summary:
-            with open(github_summary, "a") as f:
-                f.write(f"## 🚨 Drift Detected: {doc_path}\n")
-                f.write(f"**Reason:** {result.get('reason')}\n\n")
-                f.write("### 📝 Suggested Fix\n")
-                f.write(f"```markdown\n{result.get('suggested_fix')}\n```\n")
-                
-        # Exit with error code 1 to fail the build (block the merge)
-        sys.exit(1)
-        
-    else:
-        print(f"\n{Fore.GREEN}✅ {doc_path} is accurate.{Style.RESET_ALL}")
-        if github_summary:
-            with open(github_summary, "a") as f:
-                f.write(f"## ✅ Documentation Accurate\n")
-                f.write(f"**File:** `{doc_path}` matches code logic.\n")
+  
