@@ -14,13 +14,13 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 GITHUB_EVENT_PATH = os.getenv("GITHUB_EVENT_PATH")
 
-# Read API Key
+# We use the variable name 'OPENAI_API_KEY' because that is what action.yml sends,
+# but we treat it as a Google Gemini Key.
 api_key = os.getenv("OPENAI_API_KEY") 
 if not api_key:
     print(f"{Fore.RED}Error: API Key not found.{Style.RESET_ALL}")
     sys.exit(1)
 
-# Configure Gemini
 genai.configure(api_key=api_key)
 
 # ---------------------------------------------------------
@@ -34,7 +34,7 @@ def read_file(filepath):
         print(f"{Fore.RED}Error: File not found -> {filepath}")
         sys.exit(1)
 
-def post_pr_comment(reason, suggested_fix):
+def post_pr_comment(reason, suggested_fix, model_name):
     if not GITHUB_TOKEN or not GITHUB_REPOSITORY or not GITHUB_EVENT_PATH:
         print(f"{Fore.YELLOW}Skipping comment: Missing GitHub context.{Style.RESET_ALL}")
         return
@@ -42,6 +42,7 @@ def post_pr_comment(reason, suggested_fix):
     try:
         with open(GITHUB_EVENT_PATH, 'r') as f:
             event_data = json.load(f)
+            # Handle both Pull Request and Issue Comment events
             pr_number = event_data.get('pull_request', {}).get('number') or \
                         event_data.get('issue', {}).get('number')
             if not pr_number: return
@@ -56,6 +57,7 @@ def post_pr_comment(reason, suggested_fix):
 ```markdown
 {suggested_fix}
 ```
+(Automated by DockDesk running on {model_name})
 """
 
     url = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/issues/{pr_number}/comments"
@@ -67,33 +69,50 @@ def post_pr_comment(reason, suggested_fix):
     print(f"{Fore.GREEN}✅ Comment posted to PR #{pr_number}{Style.RESET_ALL}")
 
 def check_documentation_drift(code_content, doc_content):
-    # FIX: Use 'gemini-1.5-flash-latest' which is often more reliable
-    model = genai.GenerativeModel('gemini-1.5-flash-latest',
-        generation_config={"response_mime_type": "application/json"})
+    print(f"{Fore.CYAN}🔍 Analyzing with Gemini...{Style.RESET_ALL}")
+
+    # 🚨 ROBUST STRATEGY: Try these models in order until one works
+    models_to_try = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-pro',
+        'models/gemini-1.5-flash'
+    ]
 
     prompt = f"""
 You are 'DocuGuard'. Check if the CODE logic contradicts the DOCS.
-
 CRITICAL RULES:
-1. Flag CONTRADICTIONS only (Code says X, Docs say Y).
-2. Ignore missing details.
-3. Output strictly valid JSON: {{"has_contradiction": true/false, "reason": "...", "suggested_fix": "..."}}
+1. Flag CONTRADICTIONS only.
+2. Output strictly valid JSON: {{"has_contradiction": true/false, "reason": "...", "suggested_fix": "..."}}
 
 --- DOCS ---
 {doc_content}
-
 --- CODE ---
 {code_content}
 """
 
+    for model_name in models_to_try:
+        print(f"Trying model: {model_name}...")
+        try:
+            model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
+            response = model.generate_content(prompt)
+            # Return result immediately if successful
+            return json.loads(response.text), model_name
+        except Exception as e:
+            print(f"{Fore.YELLOW}Failed with {model_name}: {e}{Style.RESET_ALL}")
+            continue
+
+    # If we get here, ALL models failed.
+    print(f"{Fore.RED}❌ All models failed.{Style.RESET_ALL}")
+    print(f"{Fore.WHITE}Listing available models for your key...{Style.RESET_ALL}")
     try:
-        response = model.generate_content(prompt)
-        return json.loads(response.text)
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f" - {m.name}")
     except Exception as e:
-        print(f"{Fore.RED}Gemini Error: {e}{Style.RESET_ALL}")
-        # Fallback for debugging: Print available models if this fails again
-        # for m in genai.list_models(): print(m.name)
-        sys.exit(1)
+        print(f"Could not list models: {e}")
+        
+    sys.exit(1)
 
 # ---------------------------------------------------------
 # 3. MAIN EXECUTION
@@ -108,13 +127,13 @@ if __name__ == "__main__":
     code_text = read_file(code_path)
     doc_text = read_file(doc_path)
 
-    result = check_documentation_drift(code_text, doc_text)
+    result, used_model = check_documentation_drift(code_text, doc_text)
 
     if result.get("has_contradiction"):
         print(f"\n{Fore.RED}🚨 DRIFT DETECTED!{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}Reason:{Style.RESET_ALL} {result.get('reason')}")
         
-        post_pr_comment(result.get("reason"), result.get("suggested_fix"))
+        post_pr_comment(result.get("reason"), result.get("suggested_fix"), used_model)
         
         sys.exit(1)
     else:
