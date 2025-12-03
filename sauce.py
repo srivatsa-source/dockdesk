@@ -64,11 +64,28 @@ if __name__ == "__main__":
     
     result = check_documentation_drift(code_text, doc_text)
 
-    # 4. REPORT
+  # 4. REPORT (Updated for GitHub UI)
+    github_summary = os.getenv("GITHUB_STEP_SUMMARY")
+    
     if result.get("has_contradiction"):
+        # Console Output (for logs)
         print(f"\n{Fore.RED}🚨 DRIFT DETECTED in {doc_path}!{Style.RESET_ALL}")
         print(f"{Fore.YELLOW}Reason:{Style.RESET_ALL} {result.get('reason')}")
-        print(f"\n{Fore.GREEN}📝 Suggested Fix:{Style.RESET_ALL}")
-        print(f"{Fore.WHITE}{result.get('suggested_fix')}")
+        
+        # GitHub UI Output (Markdown Report)
+        if github_summary:
+            with open(github_summary, "a") as f:
+                f.write(f"## 🚨 Drift Detected: {doc_path}\n")
+                f.write(f"**Reason:** {result.get('reason')}\n\n")
+                f.write("### 📝 Suggested Fix\n")
+                f.write(f"```markdown\n{result.get('suggested_fix')}\n```\n")
+                
+        # Exit with error code 1 to fail the build (block the merge)
+        sys.exit(1)
+        
     else:
         print(f"\n{Fore.GREEN}✅ {doc_path} is accurate.{Style.RESET_ALL}")
+        if github_summary:
+            with open(github_summary, "a") as f:
+                f.write(f"## ✅ Documentation Accurate\n")
+                f.write(f"**File:** `{doc_path}` matches code logic.\n")
