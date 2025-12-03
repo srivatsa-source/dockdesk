@@ -71,12 +71,12 @@ def post_pr_comment(reason, suggested_fix, model_name):
 def check_documentation_drift(code_content, doc_content):
     print(f"{Fore.CYAN}🔍 Analyzing with Gemini...{Style.RESET_ALL}")
 
-    # 🚨 ROBUST STRATEGY: Try these models in order until one works
+    # 🚨 UPDATED: Use the models found in your logs
     models_to_try = [
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-pro',
-        'models/gemini-1.5-flash'
+        'gemini-2.0-flash',       # The new standard (fastest)
+        'gemini-2.0-flash-lite',  # Lightweight version
+        'gemini-flash-latest',    # Stable alias
+        'gemini-pro-latest'       # Fallback
     ]
 
     prompt = f"""
@@ -104,14 +104,6 @@ CRITICAL RULES:
 
     # If we get here, ALL models failed.
     print(f"{Fore.RED}❌ All models failed.{Style.RESET_ALL}")
-    print(f"{Fore.WHITE}Listing available models for your key...{Style.RESET_ALL}")
-    try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                print(f" - {m.name}")
-    except Exception as e:
-        print(f"Could not list models: {e}")
-        
     sys.exit(1)
 
 # ---------------------------------------------------------
