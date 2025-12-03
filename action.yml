@@ -1,18 +1,17 @@
 name: 'DockDesk'
-description: 'The automated documentation auditor. DockDesk ensures your README matches your Code logic.'
-author: 'DockDesk Team'
-branding:
-  icon: 'shield'  # This gives you a cool shield icon on the marketplace
-  color: 'blue'
+description: 'Automated documentation auditor.'
 inputs:
   openai_api_key:
-    description: 'OpenAI API Key'
+    description: 'API Key (Gemini or OpenAI)'
+    required: true
+  github_token:
+    description: 'GitHub Token for commenting'
     required: true
   code_file:
-    description: 'Path to the code file to check'
+    description: 'Path to code file'
     required: true
   doc_file:
-    description: 'Path to the documentation file to check'
+    description: 'Path to doc file'
     required: true
 runs:
   using: 'docker'
@@ -21,4 +20,7 @@ runs:
     - ${{ inputs.code_file }}
     - ${{ inputs.doc_file }}
   env:
+    # 🚨 CRITICAL FIX: Map the input 'openai_api_key' to the env var 'OPENAI_API_KEY'
+    # The Python script reads os.getenv("OPENAI_API_KEY"), so this must match!
     OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+    GITHUB_TOKEN: ${{ inputs.github_token }}
