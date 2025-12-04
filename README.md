@@ -73,7 +73,9 @@ graph TD
 
     style F fill:#ffcccc,stroke:#ff0000,stroke-width:2px,color:red
     style G fill:#ccffcc,stroke:#00ff00,stroke-width:2px,color:green
-📦 Setup
+```
+
+## 📦 Setup
 
 Create this file:
 
