@@ -64,9 +64,9 @@ It lives in your CI/CD pipeline and audits every Pull Request using **Gemini 2.0
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#2786F7', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f4f4f4'}}}%%
 graph TD
-    A([👨‍💻 Dev Pushes Code]) ==>|Pull Request| B(🚀 GitHub Action Triggers)
+    A([ Dev Pushes Code]) ==>|Pull Request| B( GitHub Action Triggers)
     B ==> C{📁 DockDesk Reads Files}
-    C ==>|Code & Docs| D[🤖 Gemini 2.0 AI Analysis]
+    C ==>|Code & Docs| D[ Gemini 2.0 AI Analysis]
     D ==>|Contradiction Detected?| E{Drift Found?}
     E == YES ==> F[❌ Block PR & Post Comment]
     E == NO ==> G[✅ Pass Checks]
