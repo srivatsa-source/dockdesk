@@ -13,13 +13,13 @@ init(autoreset=True)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 GITHUB_EVENT_PATH = os.getenv("GITHUB_EVENT_PATH")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # This holds the Gemini Key
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not OPENAI_API_KEY:
+if not GEMINI_API_KEY:
     print(f"{Fore.RED}Error: API Key not found.{Style.RESET_ALL}")
     sys.exit(1)
 
-genai.configure(api_key=OPENAI_API_KEY)
+genai.configure(api_key=GEMINI_API_KEY)
 
 # ---------------------------------------------------------
 # GITHUB API HELPERS

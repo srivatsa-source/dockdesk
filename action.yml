@@ -5,8 +5,8 @@ branding:
   icon: 'shield'  # Options: shield, lock, check, search, eye
   color: 'blue'   # Options: blue, green, yellow, red, purple
 inputs:
-  openai_api_key:
-    description: 'API Key (Gemini or OpenAI)'
+  gemini_api_key:
+    description: 'API Key (Gemini)'
     required: true
   github_token:
     description: 'GitHub Token for commenting'
@@ -25,7 +25,7 @@ runs:
     - ${{ inputs.code_file }}
     - ${{ inputs.doc_file }}
   env:
-    # 🚨 CRITICAL FIX: Map the input 'openai_api_key' to the env var 'OPENAI_API_KEY'
-    # The Python script reads os.getenv("OPENAI_API_KEY"), so this must match!
-    OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+    # 🚨 CRITICAL FIX: Map the input 'gemini_api_key' to the env var 'GEMINI_API_KEY'
+    # The Python script reads os.getenv("GEMINI_API_KEY"), so this must match!
+    GEMINI_API_KEY: ${{ inputs.gemini_api_key }}
     GITHUB_TOKEN: ${{ inputs.github_token }}

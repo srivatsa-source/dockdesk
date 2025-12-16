@@ -108,7 +108,7 @@ jobs:
       - name: Run AI Auditor
         uses: srivatsa-source/dockdesk@main
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
           # Files to compare
