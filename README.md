@@ -115,4 +115,46 @@ jobs:
           code_file: 'src/auth.js'
           doc_file: 'docs/API.md'
 
+## 🛠️ Interactive Mode & Agentic Workflow
+
+DockDesk is designed to be the **Verification Layer** for both human developers and AI Agents. It prevents "Knowledge Decay" by ensuring documentation is always the Source of Truth.
+
+### 🧑‍💻 For Developers (Interactive Fix)
+
+Run DockDesk locally to verify your changes before pushing. If a contradiction is found, DockDesk can **automatically fix your documentation**.
+
+```bash
+python sauce.py src/my_feature.py docs/feature_specs.md
+```
+
+**Output:**
+```text
+🚨 DRIFT DETECTED!
+Reason: Code implements 'guest' access, but docs specify 'admin-only'.
+Suggestion: Update docs to reflect guest access.
+
+🤖 DockDesk can automatically fix the documentation.
+Do you want to overwrite 'docs/feature_specs.md' with the fixed version? [y/N]: y
+✅ Documentation updated successfully!
+```
+
+### 🤖 For AI Agents (JSON Mode)
+
+Agents can invoke `sauce.py` with the `--json` flag to get machine-readable output. This allows agents to self-correct and verify their own code generation against existing documentation.
+
+```bash
+python sauce.py src/my_feature.py docs/feature_specs.md --json
+```
+
+**Output:**
+
+```json
+{
+  "has_contradiction": true,
+  "reason": "Code implements 'guest' access, but docs specify 'admin-only'.",
+  "suggested_fix_description": "Update docs to reflect guest access.",
+  "new_doc_content": "# Feature Specs\n\n..."
+}
+```
+
 <div align="center"> Built by Vatsa </div> ```

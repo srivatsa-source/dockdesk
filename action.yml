@@ -18,12 +18,23 @@ inputs:
   doc_file:
     description: 'Path to doc file'
     required: true
+  fail_on_drift:
+    description: 'Fail the workflow if drift is detected (true/false)'
+    required: false
+    default: 'true'
+outputs:
+  drift_detected:
+    description: 'True if contradiction found'
+  suggested_fix:
+    description: 'The suggested fix content'
 runs:
   using: 'docker'
   image: 'Dockerfile'
   args:
     - ${{ inputs.code_file }}
     - ${{ inputs.doc_file }}
+    - --fail-on-drift
+    - ${{ inputs.fail_on_drift }}
   env:
     # 🚨 CRITICAL FIX: Map the input 'gemini_api_key' to the env var 'GEMINI_API_KEY'
     # The Python script reads os.getenv("GEMINI_API_KEY"), so this must match!

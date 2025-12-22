@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Install dependencies (Force latest versions)
 RUN pip install --upgrade pip
-RUN pip install google-generativeai colorama requests
+RUN pip install google-genai colorama requests
 
 # Copy your script
 COPY sauce.py /app/sauce.py

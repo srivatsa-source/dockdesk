@@ -2,7 +2,9 @@ import os
 import sys
 import json
 import requests
-import google.generativeai as genai
+import argparse
+from google import genai
+from google.genai import types
 from colorama import Fore, Style, init
 
 init(autoreset=True)
@@ -15,15 +17,20 @@ GITHUB_REPOSITORY = os.getenv("GITHUB_REPOSITORY")
 GITHUB_EVENT_PATH = os.getenv("GITHUB_EVENT_PATH")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not GEMINI_API_KEY:
-    print(f"{Fore.RED}Error: API Key not found.{Style.RESET_ALL}")
-    sys.exit(1)
-
-genai.configure(api_key=GEMINI_API_KEY)
-
 # ---------------------------------------------------------
 # GITHUB API HELPERS
 # ---------------------------------------------------------
+def set_github_output(name, value):
+    """Sets a GitHub Action output variable."""
+    if "GITHUB_OUTPUT" in os.environ:
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            # Handle multiline strings safely
+            if "\n" in str(value):
+                delimiter = f"EOF_{os.urandom(4).hex()}"
+                f.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
+            else:
+                f.write(f"{name}={value}\n")
+
 def get_pr_details():
     """Extracts PR number from the GitHub Event JSON."""
     if not GITHUB_EVENT_PATH: return None
@@ -82,33 +89,58 @@ def post_comment(pr_number, body):
 # ---------------------------------------------------------
 # AI ANALYSIS
 # ---------------------------------------------------------
-def analyze_with_gemini(diff_text, doc_text):
-    print(f"{Fore.CYAN}🧠 Analyzing logic with Gemini 2.0...{Style.RESET_ALL}")
+def analyze_with_gemini(code_context, doc_text, context_type="diff", verbose=True):
+    if verbose:
+        print(f"{Fore.CYAN}🧠 Analyzing logic with Gemini 2.0...{Style.RESET_ALL}")
     
-    models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    # Updated model list based on available models for the key
+    models = [
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-001',
+        'gemini-flash-latest',
+        'gemini-2.0-flash-exp'
+    ]
     
+    prompt_context = "PR CODE CHANGES (Diffs)" if context_type == "diff" else "FULL SOURCE CODE"
+
     prompt = f"""
-    You are DockGuard. Compare the PR CODE CHANGES (Diffs) against the DOCUMENTATION.
+    You are DockGuard. Compare the {prompt_context} against the DOCUMENTATION.
     
     RULES:
     1. Focus on LOGIC CONTRADICTIONS (e.g., Code adds 'admin_only' check, Docs say 'public').
     2. IGNORE refactors or variable renames.
     3. If the code introduces a NEW feature not in docs, suggest adding it.
-    4. Output strictly valid JSON: {{"has_contradiction": true/false, "reason": "...", "suggested_fix": "..."}}
+    4. Output strictly valid JSON.
+    
+    JSON FORMAT:
+    {{
+        "has_contradiction": true/false,
+        "reason": "Concise explanation",
+        "suggested_fix_description": "Human readable suggestion",
+        "new_doc_content": "The FULL updated documentation text with the fix applied. Return null if no contradiction."
+    }}
 
     --- DOCUMENTATION (Source of Truth) ---
     {doc_text}
 
-    --- CODE CHANGES (The Diff) ---
-    {diff_text}
+    --- {prompt_context} ---
+    {code_context}
     """
 
     for model_name in models:
         try:
-            model = genai.GenerativeModel(model_name, generation_config={"response_mime_type": "application/json"})
-            response = model.generate_content(prompt)
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
+            )
             return json.loads(response.text), model_name
-        except:
+        except Exception as e:
+            if verbose:
+                print(f"{Fore.YELLOW}Warning: Model {model_name} failed: {e}{Style.RESET_ALL}")
             continue
     
     return None, None
@@ -117,53 +149,117 @@ def analyze_with_gemini(diff_text, doc_text):
 # MAIN
 # ---------------------------------------------------------
 if __name__ == "__main__":
-    # We still take doc_path as an argument because we need a "Source of Truth"
-    if len(sys.argv) < 3:
-        # If no code file provided, we assume "Smart Mode" (Only doc provided)
-        # Usage: python sauce.py "SMART_MODE" "docs.md"
-        pass
+    parser = argparse.ArgumentParser(description='DockDesk AI Auditor')
+    parser.add_argument('code_path', help='Path to code file or "AUTO" to scan PR changes')
+    parser.add_argument('doc_path', help='Path to documentation file')
+    parser.add_argument('--json', action='store_true', help='Output result as JSON (useful for agents)')
+    parser.add_argument('--fail-on-drift', type=str, default='true', help='Fail exit code on drift (true/false)')
+    
+    args = parser.parse_args()
 
-    # Read args (We might ignore code_path in smart mode)
-    code_path_arg = sys.argv[1]
-    doc_path = sys.argv[2]
+    # Check API Key
+    if not GEMINI_API_KEY:
+        if args.json:
+            print(json.dumps({"error": "GEMINI_API_KEY environment variable not found."}))
+            sys.exit(1)
+        else:
+            print(f"{Fore.RED}Error: GEMINI_API_KEY environment variable not found.{Style.RESET_ALL}")
+            sys.exit(1)
 
     # 1. Read Documentation
     try:
-        with open(doc_path, 'r', encoding='utf-8') as f:
+        with open(args.doc_path, 'r', encoding='utf-8') as f:
             doc_text = f.read()
     except FileNotFoundError:
-        print(f"{Fore.RED}Error: Documentation file '{doc_path}' not found.{Style.RESET_ALL}")
-        sys.exit(1)
+        if args.json:
+            print(json.dumps({"error": f"Documentation file '{args.doc_path}' not found."}))
+            sys.exit(1)
+        else:
+            print(f"{Fore.RED}Error: Documentation file '{args.doc_path}' not found.{Style.RESET_ALL}")
+            sys.exit(1)
 
     # 2. Get Code Context (Smart vs Manual)
     pr_number = get_pr_details()
+    code_context = None
+    context_type = "diff"
     
-    if pr_number:
+    if pr_number and args.code_path == "AUTO":
         # SMART MODE: Ignore local file arg, look at the PR
         code_context = get_pr_diffs(pr_number)
         if not code_context:
-            print("No code changes found in this PR to analyze.")
+            if args.json:
+                print(json.dumps({"message": "No code changes found in this PR."}))
+            else:
+                print("No code changes found in this PR to analyze.")
             sys.exit(0)
     else:
         # MANUAL MODE: Use the file passed in args (for local testing)
-        print(f"{Fore.YELLOW}No PR detected. Running in local/manual mode on {code_path_arg}{Style.RESET_ALL}")
+        if not args.json:
+            print(f"{Fore.YELLOW}No PR detected. Running in local/manual mode on {args.code_path}{Style.RESET_ALL}")
+        
+        context_type = "full_source"
         try:
-            with open(code_path_arg, 'r', encoding='utf-8') as f:
+            with open(args.code_path, 'r', encoding='utf-8') as f:
                 code_context = f.read()
-        except:
+        except FileNotFoundError:
+             if args.json:
+                print(json.dumps({"error": f"Code file '{args.code_path}' not found."}))
+                sys.exit(1)
+             else:
+                print(f"{Fore.RED}Error: Code file '{args.code_path}' not found.{Style.RESET_ALL}")
+                sys.exit(1)
+        except Exception as e:
             sys.exit(1)
 
     # 3. Analyze
-    result, model = analyze_with_gemini(code_context, doc_text)
+    result, model = analyze_with_gemini(code_context, doc_text, context_type=context_type, verbose=not args.json)
 
-    if result and result.get("has_contradiction"):
-        print(f"\n{Fore.RED}🚨 DRIFT DETECTED!{Style.RESET_ALL}")
-        print(f"Reason: {result.get('reason')}")
-        
-        # Post comment if in a PR
-        if pr_number:
-            body = f"### 🚨 DockDesk detected a conflict\n**Reason:** {result['reason']}\n\n**Suggestion:**\n```markdown\n{result['suggested_fix']}\n```\n*(Analyzed {len(code_context)} chars of code changes)*"
-            post_comment(pr_number, body)
-            sys.exit(1) # Fail build
+    if args.json:
+        if result:
+            print(json.dumps(result, indent=2))
+        else:
+            print(json.dumps({"error": "AI Analysis failed. Check API Key quota or model availability."}))
+            sys.exit(1)
     else:
-        print(f"\n{Fore.GREEN}✅ No contradictions found.{Style.RESET_ALL}")
+        if result:
+            if result.get("has_contradiction"):
+                print(f"\n{Fore.RED}🚨 DRIFT DETECTED!{Style.RESET_ALL}")
+                print(f"{Fore.YELLOW}Reason:{Style.RESET_ALL} {result.get('reason')}")
+                print(f"{Fore.YELLOW}Suggestion:{Style.RESET_ALL} {result.get('suggested_fix_description')}")
+                
+                # Interactive Fix Mode
+                if result.get("new_doc_content"):
+                    print(f"\n{Fore.CYAN}🤖 DockDesk can automatically fix the documentation.{Style.RESET_ALL}")
+                    choice = input(f"Do you want to overwrite '{args.doc_path}' with the fixed version? [y/N]: ").strip().lower()
+                    if choice == 'y':
+                        try:
+                            with open(args.doc_path, 'w', encoding='utf-8') as f:
+                                f.write(result['new_doc_content'])
+                            print(f"{Fore.GREEN}✅ Documentation updated successfully!{Style.RESET_ALL}")
+                        except Exception as e:
+                            print(f"{Fore.RED}❌ Failed to write file: {e}{Style.RESET_ALL}")
+                    else:
+                        print(f"{Fore.YELLOW}⚠️ Changes skipped.{Style.RESET_ALL}")
+
+                # Post comment if in a PR
+                if pr_number:
+                    body = f"### 🚨 DockDesk detected a conflict\n**Reason:** {result['reason']}\n\n**Suggestion:**\n{result.get('suggested_fix_description')}\n\n*(Analyzed {len(code_context)} chars of code changes)*"
+                    post_comment(pr_number, body)
+                
+                # Set GitHub Outputs
+                set_github_output("drift_detected", "true")
+                set_github_output("suggested_fix", result.get('suggested_fix_description', ''))
+                set_github_output("new_doc_content", result.get('new_doc_content', ''))
+
+                # Exit logic based on fail-on-drift flag
+                if args.fail_on_drift.lower() == 'true':
+                    sys.exit(1) # Fail build
+                else:
+                    print(f"{Fore.YELLOW}⚠️ Drift detected, but fail-on-drift is false. Exiting with success.{Style.RESET_ALL}")
+                    sys.exit(0)
+            else:
+                print(f"\n{Fore.GREEN}✅ No contradictions found. Docs are in sync.{Style.RESET_ALL}")
+                set_github_output("drift_detected", "false")
+        else:
+            print(f"\n{Fore.RED}❌ Analysis Failed. Could not connect to any Gemini models.{Style.RESET_ALL}")
+            sys.exit(1)
