@@ -9,7 +9,7 @@ RUN pip install --upgrade pip
 RUN pip install google-genai colorama requests
 
 # Copy your script
-COPY sauce.py /app/sauce.py
+COPY integrity_agent.py /app/integrity_agent.py
 
 # Run it
-ENTRYPOINT ["python", "/app/sauce.py"]
+ENTRYPOINT ["python", "/app/integrity_agent.py"]
