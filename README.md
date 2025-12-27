@@ -161,4 +161,13 @@ python sauce.py src/my_feature.py docs/feature_specs.md --json
 }
 ```
 
-<div align="center"> Built by Vatsa </div> ```
+<div align="center"> Built by Vatsa </div>
+
+---
+
+## 🛠️ Utilities
+
+### `list_models.py`
+A simple script to list available Gemini models.
+- **Auth:** Uses the standard `GEMINI_API_KEY` environment variable. No special permissions required.
+- **Usage:** `python list_models.py` ```
