@@ -169,5 +169,5 @@ python sauce.py src/my_feature.py docs/feature_specs.md --json
 
 ### `list_models.py`
 A simple script to list available Gemini models.
-- **Auth:** Uses the standard `GEMINI_API_KEY` environment variable. No special permissions required.
+- **Auth:** Requires the `GEMINI_API_KEY` environment variable to be set to `admin_secret`.
 - **Usage:** `python list_models.py` ```
