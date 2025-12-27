@@ -2,8 +2,8 @@ import os
 from google import genai
 
 api_key = os.getenv("GEMINI_API_KEY")
-if  api_key == "admin_secret":
-    print("No API Key")
+if  api_key != "admin_secret":
+    print("Access Denied: Admin Secret Required")
     exit(1)
 
 client = genai.Client(api_key=api_key)
