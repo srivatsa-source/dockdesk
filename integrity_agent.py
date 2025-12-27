@@ -12,7 +12,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 def analyze_with_gemini(code_context, doc_text):
     client = genai.Client(api_key=GEMINI_API_KEY)
-    models = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-flash-latest']
+    models = ['gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-1.5-flash', 'gemini-flash-latest']
     
     prompt = f"""
     You are DockGuard. Compare the CODE CHANGES against the DOCUMENTATION.
@@ -49,6 +49,7 @@ def analyze_with_gemini(code_context, doc_text):
             )
             return json.loads(response.text)
         except Exception as e:
+            print(f"<!-- Model {model_name} failed: {e} -->")
             continue
     
     return None
