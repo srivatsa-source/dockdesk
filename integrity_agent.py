@@ -75,7 +75,13 @@ if __name__ == "__main__":
 
     # 2. Read Changed Files
     code_context = ""
+    current_script = os.path.basename(__file__)
+    
     for file_path in args.files:
+        # Ignore the agent itself and the documentation file to avoid self-referential confusion
+        if file_path.endswith(current_script) or file_path == args.doc:
+            continue
+            
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 code_context += f"\n\n--- FILE: {file_path} ---\n{f.read()}"
