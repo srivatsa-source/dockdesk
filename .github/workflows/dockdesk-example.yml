@@ -1,13 +1,12 @@
 # =============================================================================
-# DockDesk Semantic Auditor - GitHub Actions Workflow (v3.1)
+# DockDesk Semantic Auditor - GitHub Actions Workflow (v3.2)
 # =============================================================================
 # This workflow runs DockDesk on every pull request to ensure documentation
 # stays in sync with code changes. Copy this file to your repository's
 # .github/workflows/ directory to enable automated semantic auditing.
 #
-# v3.1: Runs on ubuntu-latest with native Ollama install (no Docker).
-#       Free disk space first, install Ollama via curl, pull model, audit.
-#       RAG disabled by default to reduce disk usage (~800MB torch saved).
+# v3.2: Fixed git diff in CI (fetch-depth + base branch fetch).
+#       Only changed files are audited — no more 20+ minute Merkle scans.
 # =============================================================================
 
 name: DockDesk Audit
@@ -43,6 +42,12 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch Base Branch
+        if: github.event_name == 'pull_request'
+        run: git fetch origin ${{ github.base_ref }} --depth=1
 
       # -----------------------------------------------------------------------
       # Free disk space & install Ollama natively (no Docker needed)
